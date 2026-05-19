@@ -36,6 +36,20 @@ def main() -> None:
         help="Directory for generated outputs.",
     )
 
+    parser.add_argument(
+        "--yolo-model",
+        type=str,
+        default=None,
+        help="Optional path to YOLO-World weights.",
+    )
+
+    parser.add_argument(
+        "--sam-checkpoint",
+        type=str,
+        default=None,
+        help="Optional path to SAM checkpoint.",
+    )
+
     args = parser.parse_args()
 
     image_path = Path(args.image)
@@ -50,6 +64,8 @@ def main() -> None:
         command=args.command,
         image_path=str(image_path),
         output_dir=args.output_dir,
+        yolo_model_path=args.yolo_model,
+        sam_checkpoint_path=args.sam_checkpoint,
     )
 
     print(json.dumps(result, indent=2, ensure_ascii=False))

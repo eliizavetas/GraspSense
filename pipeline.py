@@ -29,6 +29,7 @@ class GraspSensePipeline:
         image_path: str,
         output_dir: str = "data/output",
         yolo_model_path: str | None = None,
+        sam_checkpoint_path: str | None = None,
     ) -> Dict[str, Any]:
         result: Dict[str, Any] = {
             "status": "started",
@@ -38,6 +39,7 @@ class GraspSensePipeline:
                 "image_path": image_path,
                 "output_dir": output_dir,
                 "yolo_model_path": yolo_model_path,
+                "sam_checkpoint_path": sam_checkpoint_path,
             },
             "task_understanding": None,
             "detection": None,
@@ -94,7 +96,10 @@ class GraspSensePipeline:
         try:
             from modules.segmentation import SAMSegmentor
 
-            segmentor = SAMSegmentor(output_dir=f"{output_dir}/masks")
+            segmentor = SAMSegmentor(
+                checkpoint_path=sam_checkpoint_path,
+                output_dir=f"{output_dir}/masks",
+            )
             segmentation_output = segmentor.segment(
                 image_path=image_path,
                 point_xy=point_xy,
