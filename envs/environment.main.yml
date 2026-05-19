@@ -1,0 +1,16 @@
+name: graspsense-main
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.11
+  - pip
+  - numpy=1.26.0
+  - pillow
+  - matplotlib
+  - pyyaml
+  - tqdm
+  - pip:
+      - opencv-python==4.10.0.84
+      - ultralytics
+      - segment-anything

@@ -30,6 +30,8 @@ class GraspSensePipeline:
         output_dir: str = "data/output",
         yolo_model_path: str | None = None,
         sam_checkpoint_path: str | None = None,
+        sam3d_repo_dir: str | None = None,
+        sam3d_config_path: str | None = None,
     ) -> Dict[str, Any]:
         result: Dict[str, Any] = {
             "status": "started",
@@ -40,6 +42,8 @@ class GraspSensePipeline:
                 "output_dir": output_dir,
                 "yolo_model_path": yolo_model_path,
                 "sam_checkpoint_path": sam_checkpoint_path,
+                "sam3d_repo_dir": sam3d_repo_dir,
+                "sam3d_config_path": sam3d_config_path,
             },
             "task_understanding": None,
             "detection": None,
@@ -126,7 +130,10 @@ class GraspSensePipeline:
             try:
                 from modules.segmentation import SAM3DReconstructor
 
-                reconstructor = SAM3DReconstructor()
+                reconstructor = SAM3DReconstructor(
+                    repo_dir=sam3d_repo_dir,
+                    config_path=sam3d_config_path,
+                )
                 reconstruction_output = reconstructor.reconstruct(
                     image_path=image_path,
                     mask_path=mask_path,

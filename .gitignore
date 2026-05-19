@@ -255,3 +255,6 @@ venv/
 
 # System files
 .DS_Store
+
+# Generated conda environment snapshots
+envs/*.generated.yml

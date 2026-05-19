@@ -50,6 +50,20 @@ def main() -> None:
         help="Optional path to SAM checkpoint.",
     )
 
+    parser.add_argument(
+        "--sam3d-repo",
+        type=str,
+        default=None,
+        help="Optional path to the SAM3D repository.",
+    )
+
+    parser.add_argument(
+        "--sam3d-config",
+        type=str,
+        default=None,
+        help="Optional path to the SAM3D pipeline config.",
+    )
+
     args = parser.parse_args()
 
     image_path = Path(args.image)
@@ -66,6 +80,8 @@ def main() -> None:
         output_dir=args.output_dir,
         yolo_model_path=args.yolo_model,
         sam_checkpoint_path=args.sam_checkpoint,
+        sam3d_repo_dir=args.sam3d_repo,
+        sam3d_config_path=args.sam3d_config,
     )
 
     print(json.dumps(result, indent=2, ensure_ascii=False))
