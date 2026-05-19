@@ -37,6 +37,12 @@ def main() -> None:
     )
 
     parser.add_argument(
+        "--compact",
+        action="store_true",
+        help="Print compact JSON without the full force_map array.",
+    )
+
+    parser.add_argument(
         "--yolo-model",
         type=str,
         default=None,
