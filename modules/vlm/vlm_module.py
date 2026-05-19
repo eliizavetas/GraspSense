@@ -145,6 +145,10 @@ class QwenTaskUnderstandingService:
         self._model = None
         self._processor = None
 
+    def parse(self, command: str, image_path: str | None = None) -> TaskUnderstandingResult:
+        """Compatibility alias used by the main GraspSense pipeline."""
+        return self.understand(command=command, image_path=image_path)
+
     def understand(self, command: str, image_path: str | None = None) -> TaskUnderstandingResult:
         if self.backend == "fallback":
             return parse_command_fallback(command)
