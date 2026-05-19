@@ -90,6 +90,9 @@ def main() -> None:
         sam3d_config_path=args.sam3d_config,
     )
 
+    if args.compact and isinstance(result.get("force_map"), dict):
+        result["force_map"].pop("force_map", None)
+
     print(json.dumps(result, indent=2, ensure_ascii=False))
 
 
