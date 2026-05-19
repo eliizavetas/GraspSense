@@ -28,6 +28,7 @@ class GraspSensePipeline:
         command: str,
         image_path: str,
         output_dir: str = "data/output",
+        yolo_model_path: str | None = None,
     ) -> Dict[str, Any]:
         result: Dict[str, Any] = {
             "status": "started",
@@ -36,6 +37,7 @@ class GraspSensePipeline:
                 "command": command,
                 "image_path": image_path,
                 "output_dir": output_dir,
+                "yolo_model_path": yolo_model_path,
             },
             "task_understanding": None,
             "detection": None,
@@ -75,7 +77,7 @@ class GraspSensePipeline:
         try:
             from modules.detection import YOLOWorldDetector
 
-            detector = YOLOWorldDetector()
+            detector = YOLOWorldDetector(model_path=yolo_model_path)
             detection_output = detector.detect(
                 image_path=image_path,
                 query=detection_query,
@@ -106,18 +108,28 @@ class GraspSensePipeline:
         mask_path = segmentation.get("mask_path")
 
         # Stage 4: SAM3D reconstruction
-        try:
-            from modules.segmentation import SAM3DReconstructor
+        if not mask_path:
+            result["reconstruction"] = {
+                "success": False,
+                "status": "skipped",
+                "error": "SAM3D reconstruction skipped because no SAM mask_path is available.",
+                "glb_path": None,
+                "ply_path": None,
+                "debug_mask_path": None,
+            }
+        else:
+            try:
+                from modules.segmentation import SAM3DReconstructor
 
-            reconstructor = SAM3DReconstructor(output_dir=f"{output_dir}/reconstruction")
-            reconstruction_output = reconstructor.reconstruct(
-                image_path=image_path,
-                mask_path=mask_path,
-                output_dir=f"{output_dir}/reconstruction",
-            )
-            result["reconstruction"] = self._to_dict(reconstruction_output)
-        except Exception as exc:
-            result["errors"].append(f"Reconstruction failed: {exc}")
+                reconstructor = SAM3DReconstructor()
+                reconstruction_output = reconstructor.reconstruct(
+                    image_path=image_path,
+                    mask_path=mask_path,
+                    output_dir=f"{output_dir}/reconstruction",
+                )
+                result["reconstruction"] = self._to_dict(reconstruction_output)
+            except Exception as exc:
+                result["errors"].append(f"Reconstruction failed: {exc}")
 
         reconstruction = result.get("reconstruction") or {}
         mesh_path = (
