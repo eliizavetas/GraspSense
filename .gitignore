@@ -220,3 +220,38 @@ __marimo__/
 sandbox/
 sandbox/
 sandbox/
+
+# Temporary development files
+sandbox/
+outputs/
+logs/
+
+# Runtime outputs
+data/output/
+
+# Model checkpoints and large files
+checkpoints/
+models/
+*.pt
+*.pth
+*.ckpt
+*.onnx
+
+# Generated 3D assets
+*.glb
+*.ply
+*.usd
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+
+# Environment files
+.env
+.venv/
+venv/
+
+# System files
+.DS_Store
