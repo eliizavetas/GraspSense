@@ -109,6 +109,9 @@ class SAM3DReconstructor:
             # Otherwise local sandbox/.deps packages can shadow the packages installed in sam3d-objects.
             env.pop("PYTHONPATH", None)
 
+            # Reduce CUDA memory fragmentation in SAM3D reconstruction.
+            env.setdefault("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
+
             completed = subprocess.run(
                 cmd,
                 cwd=str(self.project_root),

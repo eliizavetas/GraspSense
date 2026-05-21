@@ -1,0 +1,24 @@
+# Copy this file to configs/local.yaml and edit paths for your machine.
+# Do not commit configs/local.yaml.
+
+paths:
+  isaaclab_root: /path/to/IsaacLab
+
+  # SAM3D installation
+  sam3d_repo: /path/to/sam-3d-objects
+  sam3d_config: /path/to/sam-3d-objects/checkpoints/pipeline.yaml
+
+  # Model weights
+  sam_checkpoint: /path/to/sam_vit_h_4b8939.pth
+  yolo_model: /path/to/yolov8s-worldv2.pt
+
+envs:
+  main: graspsense-main
+  sam3d: graspsense-sam3d
+
+outputs:
+  root: data/output
+  masks: data/output/masks
+  reconstruction: data/output/reconstruction
+  usd: data/output/usd
+  stage: data/output/stage/grasp_scene.usd

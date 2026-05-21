@@ -258,3 +258,6 @@ venv/
 
 # Generated conda environment snapshots
 envs/*.generated.yml
+
+# Local machine-specific configs
+configs/local.yaml
