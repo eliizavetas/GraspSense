@@ -139,7 +139,7 @@ class QwenTaskUnderstandingService:
         device: str | None = None,
         backend: str = "auto",
     ) -> None:
-        self.model_id = model_id or "Qwen/Qwen2.5-VL"
+        self.model_id = model_id or "Qwen/Qwen2.5-VL-3B-Instruct"
         self.device = device or "auto"
         self.backend = backend
         self._model = None
@@ -165,32 +165,97 @@ class QwenTaskUnderstandingService:
             return
 
         try:
+            import torch  # type: ignore
             from transformers import AutoProcessor  # type: ignore
             from transformers import Qwen2_5_VLForConditionalGeneration  # type: ignore
         except Exception as exc:
             raise QwenBackendUnavailable(
-                "Qwen dependencies are not available. Install the appropriate transformers/Qwen stack to enable real VLM inference."
+                "Qwen dependencies are not available. Install transformers, accelerate, and qwen-vl-utils."
             ) from exc
 
-        # TODO: Verify the exact Qwen class/model id and image message formatting
-        # for the target deployment environment before enabling production inference.
-        self._processor = AutoProcessor.from_pretrained(self.model_id, trust_remote_code=True)
-        self._model = Qwen2_5_VLForConditionalGeneration.from_pretrained(
+        self._processor = AutoProcessor.from_pretrained(
             self.model_id,
             trust_remote_code=True,
+        )
+
+        self._model = Qwen2_5_VLForConditionalGeneration.from_pretrained(
+            self.model_id,
+            torch_dtype=torch.bfloat16 if torch.cuda.is_available() else torch.float32,
             device_map=self.device,
+            trust_remote_code=True,
         )
 
     def _understand_with_qwen(self, command: str, image_path: str | None) -> TaskUnderstandingResult:
         self._load_qwen_if_needed()
+
+        if self._model is None or self._processor is None:
+            raise QwenBackendUnavailable("Qwen model or processor was not loaded.")
+
+        try:
+            from qwen_vl_utils import process_vision_info  # type: ignore
+        except Exception as exc:
+            raise QwenBackendUnavailable("qwen-vl-utils is required for Qwen-VL image processing.") from exc
+
         prompt = build_qwen_prompt(command)
 
-        # TODO: Implement real Qwen image+text inference once runtime dependencies,
-        # model id, processor chat template, and image loading conventions are fixed.
-        # The current integration pass deliberately avoids depending on Qwen being installed.
-        raise QwenBackendUnavailable(
-            f"Qwen inference is not wired yet for model_id={self.model_id!r}, image_path={image_path!r}."
+        content: list[dict[str, Any]] = []
+        if image_path:
+            content.append({"type": "image", "image": image_path})
+        content.append({"type": "text", "text": prompt})
+
+        messages = [
+            {
+                "role": "user",
+                "content": content,
+            }
+        ]
+
+        text = self._processor.apply_chat_template(
+            messages,
+            tokenize=False,
+            add_generation_prompt=True,
         )
+
+        image_inputs, video_inputs = process_vision_info(messages)
+
+        inputs = self._processor(
+            text=[text],
+            images=image_inputs,
+            videos=video_inputs,
+            padding=True,
+            return_tensors="pt",
+        )
+
+        # Move tensors to the first available model device.
+        try:
+            device = next(self._model.parameters()).device
+            inputs = inputs.to(device)
+        except Exception:
+            pass
+
+        generated_ids = self._model.generate(
+            **inputs,
+            max_new_tokens=256,
+            do_sample=False,
+        )
+
+        generated_ids_trimmed = [
+            output_ids[len(input_ids):]
+            for input_ids, output_ids in zip(inputs.input_ids, generated_ids)
+        ]
+
+        output_text = self._processor.batch_decode(
+            generated_ids_trimmed,
+            skip_special_tokens=True,
+            clean_up_tokenization_spaces=False,
+        )[0]
+
+        try:
+            return self.result_from_qwen_text(output_text)
+        except Exception as exc:
+            raise QwenBackendUnavailable(
+                f"Failed to parse Qwen JSON response: {exc}. Raw response: {output_text!r}"
+            ) from exc
 
     @staticmethod
     def result_from_qwen_text(text: str) -> TaskUnderstandingResult:
