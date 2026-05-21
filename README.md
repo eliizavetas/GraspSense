@@ -225,6 +225,7 @@ Isaac Sim does not open automatically. The pipeline runs IsaacLab in headless mo
 
 ## Important notes
 
+- Qwen task understanding is executed through an isolated subprocess. This prevents the Qwen model from keeping GPU memory occupied before the SAM3D reconstruction stage.
 - SAM3D is executed in a dedicated conda environment to avoid dependency conflicts.
 - IsaacLab operations are executed through `isaaclab.sh` subprocess wrappers.
 - `configs/local.yaml` is intentionally ignored by Git because it contains machine-specific paths.
