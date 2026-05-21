@@ -4,7 +4,7 @@ set -e
 cd "$(dirname "$0")/.."
 
 python scripts/run_pipeline.py \
-  --command "Take a cup carefully" \
+  --command "Take a paper cup carefully" \
   --image sandbox/legacy_sources/RASA+YOLO/cups_scene.png \
   --yolo-model sandbox/legacy_sources/RASA+YOLO/vision/yolov8s-worldv2.pt \
   --sam-checkpoint sandbox/legacy_sources/masha_ws/sam-3d-objects/sam_vit_h_4b8939.pth \
