@@ -108,22 +108,94 @@ This uses local paths under `sandbox/legacy_sources`.
 
 ### Scenario B: external user setup
 
-Use this if you cloned GraspSense on a new machine.
+Use this if you cloned GraspSense on a new machine and do not have access to the internal ISR Lab workspace.
 
-External users are expected to install separately:
+GraspSense provides the pipeline code and wrappers for external tools, but it does **not** store large model weights, third-party checkpoints, Isaac Sim, IsaacLab, or the full SAM3D installation inside this repository.
 
-- Isaac Sim
-- IsaacLab
-- SAM3D repository and checkpoints
-- YOLO-World weights
-- SAM checkpoint
-- optionally Qwen for real VLM-based task understanding
+External users are expected to install and configure the following components separately:
 
-The repository does not store large model weights, SAM3D checkpoints, Isaac Sim, or IsaacLab.
+- **Isaac Sim**  
+  Required for opening and visually inspecting the final USD scene.
 
-See the full setup guide:
+- **IsaacLab**  
+  Required for the headless backend steps used by GraspSense:
+  - GLB / mesh to USD conversion
+  - physics material assignment
+  - collision setup
+  - creation of the final IsaacLab scene file
 
-    docs/SETUP.md
+- **SAM3D repository and checkpoints**  
+  Required for 3D reconstruction from the RGB image and SAM mask.  
+  GraspSense does not vendor SAM3D checkpoints. You need to install SAM3D separately and provide paths to:
+  - the SAM3D repository
+  - the SAM3D pipeline config
+  - the SAM3D checkpoints
+
+- **SAM checkpoint**  
+  Required for 2D object segmentation, for example `sam_vit_h_4b8939.pth`.
+
+- **YOLO-World weights**  
+  Required for open-vocabulary object detection, for example `yolov8s-worldv2.pt`.
+
+- **Qwen model, optional for now**  
+  Required only if you want real VLM-based task understanding.  
+  If Qwen is not available, GraspSense currently falls back to a simple rule-based parser.
+
+Recommended external setup flow:
+
+1. Clone GraspSense:
+
+        git clone https://github.com/eliizavetas/GraspSense.git
+        cd GraspSense
+
+2. Create the main GraspSense environment:
+
+        conda env create -f envs/environment.main.yml
+        conda activate graspsense-main
+
+3. Create the SAM3D environment from the provided recipe:
+
+        conda env create -f envs/environment.sam3d.yml
+
+   or use:
+
+        bash scripts/setup_sam3d_env.sh
+
+   This creates the Python environment needed to run the SAM3D wrapper, but it does **not** download the SAM3D repository or checkpoints automatically.
+
+4. Install SAM3D separately according to the SAM3D installation instructions.
+
+   After installation, you should know the paths to:
+
+        /path/to/sam-3d-objects
+        /path/to/sam-3d-objects/checkpoints/pipeline.yaml
+
+5. Install Isaac Sim and IsaacLab separately.
+
+   Before running GraspSense, verify that IsaacLab works in headless mode:
+
+        cd /path/to/IsaacLab
+        conda activate <your_isaaclab_env>
+        ./isaaclab.sh -p -c "print('IsaacLab works')" --headless
+
+6. Copy the example local config:
+
+        cp configs/local.example.yaml configs/local.yaml
+
+   Then edit `configs/local.yaml` and set paths for your machine:
+
+        paths:
+          isaaclab_root: /path/to/IsaacLab
+          sam3d_repo: /path/to/sam-3d-objects
+          sam3d_config: /path/to/sam-3d-objects/checkpoints/pipeline.yaml
+          sam_checkpoint: /path/to/sam_vit_h_4b8939.pth
+          yolo_model: /path/to/yolov8s-worldv2.pt
+
+        envs:
+          main: graspsense-main
+          sam3d: graspsense-sam3d
+
+`configs/local.yaml` is machine-specific and should not be committed.
 
 ## Example command
 
