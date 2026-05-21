@@ -1,7 +1,12 @@
 from __future__ import annotations
 
+import gc
 import json
+import os
 import re
+import subprocess
+import sys
+from pathlib import Path
 from dataclasses import asdict, dataclass, field
 from typing import Any
 
@@ -58,6 +63,32 @@ def _extract_json_object(text: str) -> dict[str, Any]:
     if not isinstance(data, dict):
         raise ValueError("Qwen response JSON must be an object")
     return data
+
+def _extract_json_from_stdout(stdout: str) -> dict[str, Any] | None:
+    if not stdout:
+        return None
+
+    decoder = json.JSONDecoder()
+    candidates: list[dict[str, Any]] = []
+
+    for start, char in enumerate(stdout):
+        if char != "{":
+            continue
+
+        candidate = stdout[start:].lstrip()
+        try:
+            parsed, _ = decoder.raw_decode(candidate)
+        except Exception:
+            continue
+
+        if isinstance(parsed, dict):
+            candidates.append(parsed)
+
+    for parsed in reversed(candidates):
+        if "success" in parsed and "result" in parsed:
+            return parsed
+
+    return candidates[-1] if candidates else None
 
 
 def parse_command_fallback(command: str) -> TaskUnderstandingResult:
@@ -154,11 +185,88 @@ class QwenTaskUnderstandingService:
             return parse_command_fallback(command)
 
         try:
-            return self._understand_with_qwen(command=command, image_path=image_path)
+            if self.backend == "local":
+                return self._understand_with_qwen(command=command, image_path=image_path)
+
+            # Default behavior: run Qwen in a separate process so GPU memory is
+            # released before heavy downstream stages such as SAM3D.
+            return self._understand_with_qwen_subprocess(command=command, image_path=image_path)
+
         except Exception as exc:
             fallback = parse_command_fallback(command)
             fallback.raw_response = f"Qwen unavailable or failed; used fallback. Reason: {exc}"
             return fallback
+        finally:
+            self._release_qwen()
+
+    def _understand_with_qwen_subprocess(self, command: str, image_path: str | None) -> TaskUnderstandingResult:
+        project_root = Path(__file__).resolve().parents[2]
+        script_path = project_root / "scripts" / "run_qwen_task_understanding.py"
+
+        if not script_path.exists():
+            raise QwenBackendUnavailable(f"Qwen subprocess wrapper not found: {script_path}")
+
+        cmd = [
+            sys.executable,
+            str(script_path),
+            "--command",
+            command,
+            "--model-id",
+            self.model_id,
+            "--device",
+            self.device,
+        ]
+
+        if image_path:
+            cmd.extend(["--image", image_path])
+
+        completed = subprocess.run(
+            cmd,
+            cwd=str(project_root),
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=False,
+            env=os.environ.copy(),
+        )
+
+        parsed = _extract_json_from_stdout(completed.stdout)
+
+        if completed.returncode != 0 or not parsed or not parsed.get("success"):
+            error = parsed.get("error") if parsed else None
+            if not error:
+                error = completed.stderr.strip() or completed.stdout.strip() or "Qwen subprocess failed."
+            raise QwenBackendUnavailable(error)
+
+        result_payload = parsed.get("result")
+        if not isinstance(result_payload, dict):
+            raise QwenBackendUnavailable("Qwen subprocess returned no result object.")
+
+        return TaskUnderstandingResult(
+            target_object=str(result_payload.get("target_object", "unknown")),
+            action_type=str(result_payload.get("action_type", "unknown")),
+            interaction_mode=str(result_payload.get("interaction_mode", "default")),
+            material=str(result_payload.get("material", "unknown")),
+            properties=dict(result_payload.get("properties") or {}),
+            detection_query=str(result_payload.get("detection_query") or result_payload.get("target_object") or "object"),
+            backend=str(result_payload.get("backend", "qwen")),
+            raw_response=result_payload.get("raw_response"),
+        )
+
+    def _release_qwen(self) -> None:
+        self._model = None
+        self._processor = None
+
+        gc.collect()
+
+        try:
+            import torch  # type: ignore
+
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+                torch.cuda.ipc_collect()
+        except Exception:
+            pass
 
     def _load_qwen_if_needed(self) -> None:
         if self._model is not None and self._processor is not None:
